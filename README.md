@@ -9,3 +9,6 @@ The forms are all XML files.
 PLEASE feel free to file issues and request features.
 I would love to make an awesome TF themed bot for anyone to use!
 A TODO is pending, and will appear here soon!
+
+
+This project is open source: I'm still deciding on a license right now, but for now, I want to simply say is please credit me where you can, and point people to the DSharpPlus library if you think you can do better. <3 Let's make this project/idea kickass!
