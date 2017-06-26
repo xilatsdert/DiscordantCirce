@@ -3,12 +3,14 @@ using System.IO;
 using System.Xml;
 using System.Threading.Tasks;
 using DSharpPlus;
+using System.Text;
 
 namespace DiscordantCirce
 {
     /// <summary>
     /// This class implements the central bot logic.
-    /// It loads an oauth.txt file containing the oauth key, it creates 
+    /// It loads an oauth.txt file containing the oauth key to establish a connect to a server.
+    /// It also loads any xml file from the form directory to create an array of TFS to be used on a server.
     /// </summary>
     class Program
     {
@@ -84,7 +86,7 @@ namespace DiscordantCirce
             
         }
 
-        public static int formCount()
+        public static int FormCount()
         {
             return Directory.GetFiles(path).Length;
         }
@@ -94,8 +96,8 @@ namespace DiscordantCirce
             string description = null;
             string suffix = null;
 
-            Form[] temp = new Form[formCount()];
-            Console.WriteLine("Expecting about " + formCount() + " forms.");
+            Form[] temp = new Form[FormCount()];
+            Console.WriteLine("Expecting about " + FormCount() + " forms.");
             int i = 0;
             foreach (string file in Directory.GetFiles(Directory.GetCurrentDirectory() + "\\forms\\"))
             {
@@ -155,6 +157,45 @@ namespace DiscordantCirce
                 await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, name);
             }
         }
+        
+        /// <summary>
+        /// This method sends a message to a user listing all of the loaded forms by suffix
+        /// </summary>
+        /// <param name="discord"></param>
+        /// <param name="e"></param>
+        /// <returns></returns>
+        public static async Task ListForms(DiscordClient discord, MessageCreateEventArgs e)
+        {
+            StringBuilder loadedForms = new StringBuilder();
+
+            await discord.CreateDM(e.Message.Author.ID).Result.SendMessage("The currently loaded messages are: \n");
+
+            foreach(Form f in tfArray)
+            {
+                loadedForms.Append(f.suffix + "\n");
+            }
+
+            await discord.CreateDM(e.Author.ID).Result.SendMessage(loadedForms.ToString());
+        }
+
+        /// <summary>
+        /// This method sends a message to a user contaning all the functionalities in the bot!
+        /// </summary>
+        /// <param name="discord">The currently connected discord client</param>
+        /// <param name="e">The message event object</param>
+        /// <returns></returns>
+        public static async Task HelpMessage(DiscordClient discord, MessageCreateEventArgs e)
+        {
+            try
+            {
+                await discord.CreateDM(e.Author.ID).Result.SendMessage("Thank you! In a channel, type !cleanup to undo a change, type !zap for a transformation, and type !test to get the local computer time!");
+            }
+
+            catch(Exception whoops)
+            {
+                Console.WriteLine("A message send error occured - Could not send the Help message DM -> " + whoops);
+            }
+        }
 
         /// <summary>
         /// This method sets a new form for a discord user. Pay careful attention to the format that the form description uses. The symbol @user is used to replace
@@ -193,7 +234,7 @@ namespace DiscordantCirce
             //And tells the end user to contact the author of the code.
             {
                 await discord.CreateDM(e.Author.ID).Result.SendMessage("Something went really wrong! Contact Xilats!");
-                Console.WriteLine("You fucked up: " + whoops);
+                Console.WriteLine("And exception was caught: " + whoops);
             }
         }
 
@@ -225,9 +266,18 @@ namespace DiscordantCirce
             {
                 if (e.Message.Content.ToLower() == "!test")
                 {
-                    await e.Message.Respond("The time is " + DateTime.Now + " MST");
+                    await e.Message.Respond("The time is " + DateTime.Now);
                 }
 
+                if(e.Message.Content.ToLower() == "!help")
+                {
+                    await HelpMessage(discord, e);
+                }
+
+                if(e.Message.Content.ToLower() == "!list")
+                {
+                    await ListForms(discord, e);
+                }
 
                 if(e.Message.Content.ToLower() == "!cleanup")
                 {
