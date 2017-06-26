@@ -131,6 +131,7 @@ namespace DiscordantCirce
         /// <returns></returns>
         public static async Task Cleanup(DiscordClient discord, MessageCreateEventArgs e, bool reset)
         {
+            
             if (reset)
             {
                 await e.Message.Respond("The bot extends a shower head  before dousing " + e.Message.Author.Mention + "!");
@@ -189,6 +190,7 @@ namespace DiscordantCirce
             try
             {
                 await discord.CreateDM(e.Author.ID).Result.SendMessage("Thank you! In a channel, type !cleanup to undo a change, type !zap for a transformation, and type !test to get the local computer time!");
+                await discord.CreateDM(e.Author.ID).Result.SendMessage("Type in a channel !list for all of the loaded forms!");
             }
 
             catch(Exception whoops)
@@ -264,6 +266,7 @@ namespace DiscordantCirce
 
             discord.MessageCreated += async e =>
             {
+                    
                 if (e.Message.Content.ToLower() == "!test")
                 {
                     await e.Message.Respond("The time is " + DateTime.Now);
@@ -279,12 +282,12 @@ namespace DiscordantCirce
                     await ListForms(discord, e);
                 }
 
-                if(e.Message.Content.ToLower() == "!cleanup")
+                if(e.Message.Content.ToLower() == "!cleanup" && !e.Channel.IsPrivate)
                 {
                     await Cleanup(discord, e, true);
                 }
 
-                if (e.Message.Content.ToLower() == "!zap")
+                if (e.Message.Content.ToLower() == "!zap" && !e.Channel.IsPrivate)
                 {
                     await e.Message.Respond("The bot vibrates before blasting " + e.Message.Author.Mention +"!");
 
@@ -299,7 +302,7 @@ namespace DiscordantCirce
                     
                     catch (Exception whoops)
                     {
-                        Console.WriteLine("You fucked up: " + whoops);
+                        Console.WriteLine("An exception was caught->\n " + whoops);
                     }
                 }
             };
