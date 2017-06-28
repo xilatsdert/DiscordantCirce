@@ -190,6 +190,7 @@ namespace DiscordantCirce
             try
             {
                 await discord.CreateDM(e.Author.ID).Result.SendMessage("Thank you! In a channel, type !cleanup to undo a change, type !zap for a transformation, and type !test to get the local computer time!");
+                await Task.Delay(1000);
                 await discord.CreateDM(e.Author.ID).Result.SendMessage("Type in a channel !list for all of the loaded forms!");
             }
 
@@ -222,12 +223,22 @@ namespace DiscordantCirce
                     string newDescriptor = form_description.Replace("@user", e.Message.Author.Username);
                     await e.Message.Respond(newDescriptor);
                     await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, e.Message.Author.Username + suffix);
-                    
                 }
                 else
                 {
                     await e.Message.Respond(form_description.Replace("@user", e.Guild.GetMember(e.Author.ID).Result.Nickname));
-                    await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, e.Guild.GetMember(e.Author.ID).Result.Nickname + suffix);
+
+                    if (((e.Guild.GetMember(e.Message.Author.ID).Result.Nickname+suffix).Length) <=32) //we check to ensure that the new nickname is less than or equal to the size of the discord name length max.
+                    {
+                        await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, e.Guild.GetMember(e.Author.ID).Result.Nickname + suffix);
+                    }
+
+                    else //if not, we pull from the user's main name.
+                    {
+                        string newDescriptor = form_description.Replace("@user", e.Message.Author.Username);
+                        await e.Message.Respond(newDescriptor);
+                        await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, e.Message.Author.Username + suffix);
+                    }
                 }
 
             }
