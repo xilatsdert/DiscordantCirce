@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using DSharpPlus;
 using System.Text;
@@ -22,7 +24,11 @@ namespace DiscordantCirce
         static StreamReader oauthFile;
         static string oauth;
 
+        //data structures for handling the tfs - an array to prevent server-disk thrashing
         public static Form[] tfArray;
+
+        //And one to prevent TF abuse. We will use a dictionary so we can quickly search for a cooling user.
+        public static Dictionary<string, CoolingUser> cooldowntank = new Dictionary<string, CoolingUser>(); 
         
         static void Main(string[] args)
         {
@@ -105,9 +111,7 @@ namespace DiscordantCirce
                 xmlReader = XmlReader.Create(file);
 
                 xmlReader.ReadToFollowing("description");
-               //xmlReader.MoveToFirstAttribute();
                 description = xmlReader.ReadElementContentAsString();
-
                 xmlReader.ReadToFollowing("suffix");
                 suffix = xmlReader.ReadElementContentAsString();
 
@@ -120,6 +124,21 @@ namespace DiscordantCirce
             }
 
             return temp;
+        }
+
+        /// <summary>
+        /// This method checks each item in the cooldown tank Dictionary for a user that has cooled down. Once they have, we have remove them from the dictionary.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task CoolDownCheck()
+        {
+            foreach (string name in cooldowntank.Keys)
+            {
+                if (!cooldowntank[name].cooldown.IsRunning && cooldowntank[name].cooldown.ElapsedMilliseconds >= 30000)
+                {
+                    cooldowntank.Remove(name);
+                }
+            }
         }
 
         /// <summary>
