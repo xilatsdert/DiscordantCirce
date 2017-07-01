@@ -16,34 +16,45 @@ namespace DiscordantCirce
     public class CoolingUser
     {
         //This class consists of two members, a user who just called a tf, and a cooldown timer.
-        public DiscordUser user;
+        //The user is identified by their discord ulong. That way we don't have to deal with common circumvention methods.
+        public ulong user;
         public Stopwatch cooldown;
 
         /// <summary>
         /// This constructor just needs a user to be added to a datastructure for the cooldown to start. We recommend a linked list in this case.
         /// </summary>
         /// <param name="user">The DiscordUser object that called the tf message</param>
-        public CoolingUser(DiscordUser user)
+        public CoolingUser(ulong user)
         {
             this.user = user;
             this.cooldown = new Stopwatch();
-            cooldownStart();
+            this.cooldown.Start();
         }
 
         /// <summary>
         /// This method starts the cooldown process.
         /// </summary>
         /// <returns></returns>
-        private void cooldownStart()
+        private async Task cooldownStart()
         {
-            cooldown.Start();
-            while (cooldown.IsRunning)
-            {
-                if (cooldown.ElapsedMilliseconds == 30000)
+
+           await Task.WhenAll(
+                Task.Run(() =>
                 {
-                    cooldown.Stop();
+
+
+                    
+                    while (cooldown.IsRunning)
+                    {
+                        if (cooldown.ElapsedMilliseconds >= 10000)
+                        {
+                            cooldown.Stop();
+                            Console.WriteLine(cooldown.ElapsedMilliseconds);
+                        }
+                    }
                 }
-            }
+                )
+                );
         }
     }
 }
