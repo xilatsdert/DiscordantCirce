@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using DSharpPlus;
 using System.Text;
@@ -22,8 +24,14 @@ namespace DiscordantCirce
         static StreamReader oauthFile;
         static string oauth;
 
+        //data structures for handling the tfs - an array to prevent server-disk thrashing
         public static Form[] tfArray;
-        
+
+        //And one to prevent TF abuse. We will use a dictionary so we can easily store a cooling user (This is a poor man's dynamic database)
+        //And another to actually track WHO is in the tank.
+        public static Dictionary<ulong, CoolingUser> cooldowntank = new Dictionary<ulong, CoolingUser>();
+        public static List<ulong> usercooldownIndex = new List<ulong>();
+
         static void Main(string[] args)
         {
             try
@@ -105,9 +113,7 @@ namespace DiscordantCirce
                 xmlReader = XmlReader.Create(file);
 
                 xmlReader.ReadToFollowing("description");
-               //xmlReader.MoveToFirstAttribute();
                 description = xmlReader.ReadElementContentAsString();
-
                 xmlReader.ReadToFollowing("suffix");
                 suffix = xmlReader.ReadElementContentAsString();
 
@@ -120,6 +126,40 @@ namespace DiscordantCirce
             }
 
             return temp;
+        }
+
+        /// <summary>
+        /// This method checks each item in the cooldown tank Dictionary for a user that has cooled down. Once they have, we have remove them from the dictionary and LIst tracker
+        /// This needs to be tossed onto another thread or else we got at hread blocker.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task CoolDownCheck()
+        {
+            await Task.WhenAll(
+            Task.Run(() =>
+            {
+            for(int id = 0; id < usercooldownIndex.Count; id++)
+                {
+                   // while (cooldowntank.Count > 0)
+                    {
+                        if (cooldowntank[usercooldownIndex[id]].cooldown.ElapsedMilliseconds >= 10000)
+                        {
+                            ulong userID = usercooldownIndex[id];
+                            cooldowntank.Remove(userID);
+                            usercooldownIndex.Remove(userID);
+                            Console.WriteLine("REMOVED A USER");
+                        }
+
+                        else
+                        { 
+                            {
+                                Console.WriteLine("User ID still in Timeout -> " + id + " :: Seconds in time out -> " + cooldowntank[usercooldownIndex[id]].cooldown.ElapsedMilliseconds/1000);
+                            }
+                        }
+                    }
+                }
+            })
+            );
         }
 
         /// <summary>
@@ -210,7 +250,7 @@ namespace DiscordantCirce
         /// <param name="suffix">-[form] suffix to attach to a user. E.G., Tyr become Tyr-wolf</param>
         /// <returns></returns>
         public static async Task FormSetter(DiscordClient discord, MessageCreateEventArgs e, string form_description, string suffix)
-        {
+        { 
             try
             {
                 await Cleanup(discord, e, false);
@@ -247,7 +287,13 @@ namespace DiscordantCirce
             //And tells the end user to contact the author of the code.
             {
                 await discord.CreateDM(e.Author.ID).Result.SendMessage("Something went really wrong! Contact Xilats!");
-                Console.WriteLine("And exception was caught: " + whoops);
+                Console.WriteLine("An exception was caught: " + whoops);
+                await Task.Yield();
+            }
+
+            finally
+            {
+               await discord.CreateDM(e.Message.Author.ID).Result.SendMessage("10 second cooldown engaged. Please do not spam the bot!");
             }
         }
 
@@ -264,9 +310,10 @@ namespace DiscordantCirce
                 UseInternalLogHandler = false
              });
 
-            discord.DebugLogger.LogMessageReceived += (o, e) =>
+            discord.DebugLogger.LogMessageReceived += async (o, e) =>
             {
                 Console.WriteLine($"[{e.TimeStamp}] [{e.Application}] [{e.Level}] {e.Message}");
+                await CoolDownCheck();
             };
 
             discord.GuildAvailable += e =>
@@ -277,6 +324,8 @@ namespace DiscordantCirce
 
             discord.MessageCreated += async e =>
             {
+
+
                     
                 if (e.Message.Content.ToLower() == "!test")
                 {
@@ -292,34 +341,58 @@ namespace DiscordantCirce
                 {
                     await ListForms(discord, e);
                 }
-
-                if(e.Message.Content.ToLower() == "!cleanup" && !e.Channel.IsPrivate)
+                if (!cooldowntank.ContainsKey(e.Author.ID))
                 {
-                    await Cleanup(discord, e, true);
+                    if (e.Message.Content.ToLower() == "!cleanup" && !e.Channel.IsPrivate)
+                    {
+                        await Cleanup(discord, e, true);
+                        usercooldownIndex.Add(e.Author.ID);
+                        cooldowntank.Add(e.Author.ID,
+                            new CoolingUser(e.Author.ID));
+                        //await CoolDownCheck();
+                    }
+
+                    if (e.Message.Content.ToLower() == "!zap" && !e.Channel.IsPrivate)
+                    {
+                        await e.Message.Respond("The bot vibrates before blasting " + e.Message.Author.Mention + "!");
+
+                        Random rand = new Random();
+                        int form = rand.Next(tfArray.Length);
+
+                        try
+                        {
+                            await FormSetter(discord, e, tfArray[form].description, tfArray[form].suffix);
+                            form = rand.Next(tfArray.Length);
+                        }
+
+                        catch (Exception whoops)
+                        {
+                            Console.WriteLine("An exception was caught->\n " + whoops);
+                        }
+
+                        finally
+                        {
+                            usercooldownIndex.Add(e.Author.ID);
+                            cooldowntank.Add(e.Author.ID,
+                                new CoolingUser(e.Author.ID));
+                            //await CoolDownCheck();
+                        }
+                    }
+
+                else
+                {
+                    //Console.WriteLine("User is still in time out!");
                 }
 
-                if (e.Message.Content.ToLower() == "!zap" && !e.Channel.IsPrivate)
-                {
-                    await e.Message.Respond("The bot vibrates before blasting " + e.Message.Author.Mention +"!");
+              }
 
-                    Random rand = new Random();
-                    int form = rand.Next(tfArray.Length);
-
-                    try
-                    {
-                        await FormSetter(discord, e, tfArray[form].description, tfArray[form].suffix);      
-                        form = rand.Next(tfArray.Length);
-                    }
-                    
-                    catch (Exception whoops)
-                    {
-                        Console.WriteLine("An exception was caught->\n " + whoops);
-                    }
-                }
+                await CoolDownCheck();
             };
 
             await discord.Connect();
+            //await CoolDownCheck();
             await Task.Delay(-1);
+
         }
 
     }
