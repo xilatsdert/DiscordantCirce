@@ -37,7 +37,7 @@ namespace DiscordantCirce
             try
             {
                 tfArray = GetForms();
-                if(tfArray.Length == 0)
+                if (tfArray.Length == 0)
                 {
                     throw new Exception();
                 }
@@ -61,13 +61,13 @@ namespace DiscordantCirce
                 using (oauthFile = File.OpenText(oauthPath + "\\oauth.txt")) //open and then close the file.
                 {
                     oauth = oauthFile.ReadLine();
-                    if(oauth.Length == 0 || oauth == null)
+                    if (oauth.Length == 0 || oauth == null)
                     {
                         throw new FileLoadException();
                     }
                 }
             }
-            
+
             //Catches for three pertinent cases on the oauth file.
             catch (FileNotFoundException) //Catch the missing OAUTH file 
             {
@@ -91,7 +91,7 @@ namespace DiscordantCirce
             }
 
             Run().GetAwaiter().GetResult();
-            
+
         }
 
         public static int FormCount()
@@ -122,7 +122,7 @@ namespace DiscordantCirce
                     temp[i] = new Form(description, suffix);
                     i++;
                 }
-                
+
             }
 
             return temp;
@@ -138,22 +138,22 @@ namespace DiscordantCirce
             await Task.WhenAll(
             Task.Run(() =>
             {
-            for(int id = 0; id < usercooldownIndex.Count; id++)
+                for (int id = 0; id < usercooldownIndex.Count; id++)
                 {
-                   // while (cooldowntank.Count > 0)
+                    // while (cooldowntank.Count > 0)
                     {
                         if (cooldowntank[usercooldownIndex[id]].cooldown.ElapsedMilliseconds >= 10000)
                         {
-                            ulong userID = usercooldownIndex[id];
-                            cooldowntank.Remove(userID);
-                            usercooldownIndex.Remove(userID);
+                            ulong userId = usercooldownIndex[id];
+                            cooldowntank.Remove(userId);
+                            usercooldownIndex.Remove(userId);
                             Console.WriteLine("REMOVED A USER");
                         }
 
                         else
-                        { 
+                        {
                             {
-                                Console.WriteLine("User ID still in Timeout -> " + id + " :: Seconds in time out -> " + cooldowntank[usercooldownIndex[id]].cooldown.ElapsedMilliseconds/1000);
+                                Console.WriteLine("User ID still in Timeout -> " + id + " :: Seconds in time out -> " + cooldowntank[usercooldownIndex[id]].cooldown.ElapsedMilliseconds / 1000);
                             }
                         }
                     }
@@ -171,12 +171,12 @@ namespace DiscordantCirce
         /// <returns></returns>
         public static async Task Cleanup(DiscordClient discord, MessageCreateEventArgs e, bool reset)
         {
-            
+
             if (reset)
             {
-                await e.Message.Respond("The bot extends a shower head  before dousing " + e.Message.Author.Mention + "!");
+                await e.Message.RespondAsync("The bot extends a shower head  before dousing " + e.Message.Author.Mention + "!");
             }
-            string name = e.Guild.GetMember(e.Author.ID).Result.Nickname;
+            string name = e.Guild.GetMemberAsync(e.Author.Id).Result.Nickname;
             Console.WriteLine(name);
             if (name != null && name.Length > 0)
             {
@@ -184,21 +184,21 @@ namespace DiscordantCirce
                 {
                     string newName = name.Split('-')[0];
                     Console.WriteLine(newName);
-                    await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, newName);
+                    await discord.GetGuildAsync(e.Guild.Id).Result.GetMemberAsync(e.Author.Id).Result.ModifyAsync(newName);
                 }
 
                 catch (NullReferenceException)
                 {
-                    Console.WriteLine("There was an issue where we couldn't properly split the user ID from the suffix.");
+                    Console.WriteLine("There was an issue where we couldn't properly split the user Id from the suffix.");
                 }
             }
 
             else
             {
-                await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, name);
+                await discord.GetGuildAsync(e.Guild.Id).Result.GetMemberAsync(e.Author.Id).Result.ModifyAsync(name);
             }
         }
-        
+
         /// <summary>
         /// This method sends a message to a user listing all of the loaded forms by suffix
         /// </summary>
@@ -209,14 +209,14 @@ namespace DiscordantCirce
         {
             StringBuilder loadedForms = new StringBuilder();
 
-            await discord.CreateDM(e.Message.Author.ID).Result.SendMessage("The currently loaded messages are: \n");
+            await discord.CreateDmAsync(e.Message.Author).Result.SendMessageAsync("The currently loaded messages are: \n");
 
-            foreach(Form f in tfArray)
+            foreach (Form f in tfArray)
             {
                 loadedForms.Append(f.suffix + "\n");
             }
 
-            await discord.CreateDM(e.Author.ID).Result.SendMessage(loadedForms.ToString());
+            await discord.CreateDmAsync(e.Author).Result.SendMessageAsync(loadedForms.ToString());
         }
 
         /// <summary>
@@ -229,12 +229,12 @@ namespace DiscordantCirce
         {
             try
             {
-                await discord.CreateDM(e.Author.ID).Result.SendMessage("Thank you! In a channel, type !cleanup to undo a change, type !zap for a transformation, and type !test to get the local computer time!");
+                await discord.CreateDmAsync(e.Author).Result.SendMessageAsync("Thank you! In a channel, type !cleanup to undo a change, type !zap for a transformation, and type !test to get the local computer time!");
                 await Task.Delay(1000);
-                await discord.CreateDM(e.Author.ID).Result.SendMessage("Type in a channel !list for all of the loaded forms!");
+                await discord.CreateDmAsync(e.Author).Result.SendMessageAsync("Type in a channel !list for all of the loaded forms!");
             }
 
-            catch(Exception whoops)
+            catch (Exception whoops)
             {
                 Console.WriteLine("A message send error occured - Could not send the Help message DM -> " + whoops);
             }
@@ -250,34 +250,40 @@ namespace DiscordantCirce
         /// <param name="suffix">-[form] suffix to attach to a user. E.G., Tyr become Tyr-wolf</param>
         /// <returns></returns>
         public static async Task FormSetter(DiscordClient discord, MessageCreateEventArgs e, string form_description, string suffix)
-        { 
+        {
             try
             {
                 await Cleanup(discord, e, false);
 
                 //adjust user nickname. If there is no nickname, take current username and append the suffix, creating a nickname.
                 //else, we do create the new nickname using an existing nickname. 
-                if(e.Guild.GetMember(e.Message.Author.ID).Result.Nickname == null ||
-                    e.Guild.GetMember(e.Message.Author.ID).Result.Nickname.Length == 0)
+                if (e.Guild.GetMemberAsync(e.Message.Author.Id).Result.Nickname == null ||
+                    e.Guild.GetMemberAsync(e.Message.Author.Id).Result.Nickname.Length == 0)
                 {
                     string newDescriptor = form_description.Replace("@user", e.Message.Author.Username);
-                    await e.Message.Respond(newDescriptor);
-                    await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, e.Message.Author.Username + suffix);
+                    await e.Message.RespondAsync(newDescriptor);
+                    //await discord.ModifyMember(e.Guild.Id, e.Message.Author.Id, e.Message.Author.Username + suffix);
+                    await discord.GetGuildAsync(e.Guild.Id).Result.GetMemberAsync(e.Author.Id).Result.ModifyAsync(e.Message.Author.Username + suffix);
                 }
                 else
                 {
-                    await e.Message.Respond(form_description.Replace("@user", e.Guild.GetMember(e.Author.ID).Result.Nickname));
+                    //await e.Message.RespondAsync(form_description.Replace("@user", e.Guild.GetMember(e.Author.Id).Result.Nickname));
+                    await e.Message.RespondAsync(form_description.Replace("@user", e.Guild.GetMemberAsync(e.Author.Id).Result.Nickname));
 
-                    if (((e.Guild.GetMember(e.Message.Author.ID).Result.Nickname+suffix).Length) <=32) //we check to ensure that the new nickname is less than or equal to the size of the discord name length max.
+                    if (((e.Guild.GetMemberAsync(e.Message.Author.Id).Result.Nickname + suffix).Length) <= 32) //we check to ensure that the new nickname is less than or equal to the size of the discord name length max.
                     {
-                        await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, e.Guild.GetMember(e.Author.ID).Result.Nickname + suffix);
+                        //await discord.ModifyMember(e.Guild.Id, e.Message.Author.Id, e.Guild.GetMember(e.Author.Id).Result.Nickname + suffix);
+                        await discord.GetGuildAsync(e.Guild.Id).Result.GetMemberAsync(e.Author.Id).Result.ModifyAsync(
+                            discord.GetGuildAsync(e.Guild.Id).Result.GetMemberAsync(e.Author.Id).Result.Nickname + suffix);
                     }
 
                     else //if not, we pull from the user's main name.
                     {
                         string newDescriptor = form_description.Replace("@user", e.Message.Author.Username);
-                        await e.Message.Respond(newDescriptor);
-                        await discord.ModifyMember(e.Guild.ID, e.Message.Author.ID, e.Message.Author.Username + suffix);
+                        await e.Message.RespondAsync(newDescriptor);
+                        //await discord.ModifyMember(e.Guild.Id, e.Message.Author.Id, e.Message.Author.Username + suffix);
+                        await discord.GetGuildAsync(e.Guild.Id).Result.GetMemberAsync(e.Author.Id).Result.ModifyAsync(
+                            discord.GetGuildAsync(e.Guild.Id).Result.GetMemberAsync(e.Author.Id).Result.Username + suffix);
                     }
                 }
 
@@ -286,33 +292,37 @@ namespace DiscordantCirce
             catch (Exception whoops) //This code catches everything. The log is left on the running platform so we can catch exceptions, 
             //And tells the end user to contact the author of the code.
             {
-                await discord.CreateDM(e.Author.ID).Result.SendMessage("Something went really wrong! Contact Xilats!");
+                await discord.CreateDmAsync(e.Author).Result.SendMessageAsync("Something went really wrong! Contact Xilats!");
                 Console.WriteLine("An exception was caught: " + whoops);
                 await Task.Yield();
             }
 
             finally
             {
-               await discord.CreateDM(e.Message.Author.ID).Result.SendMessage("10 second cooldown engaged. Please do not spam the bot!");
+                await discord.CreateDmAsync(e.Message.Author).Result.SendMessageAsync("10 second cooldown engaged. Please do not spam the bot!");
             }
         }
 
         public static async Task Run()
         {
+
+            //We are using a try here because the bot tends to not deal with weird connection events well.
+            //As such, if an error is detected, we assume that we want to reconnect.
+            //We wait for the bot admin to hit any key to stop the reconnect process.
             var discord = new DiscordClient(new DiscordConfig
             {
                 AutoReconnect = true,
                 DiscordBranch = Branch.Stable,
                 LargeThreshold = 250,
-                LogLevel = LogLevel.Unnecessary,
+                LogLevel = LogLevel.Warning,
                 Token = oauth,
                 TokenType = TokenType.Bot,
                 UseInternalLogHandler = false
-             });
+            });
 
             discord.DebugLogger.LogMessageReceived += async (o, e) =>
             {
-                Console.WriteLine($"[{e.TimeStamp}] [{e.Application}] [{e.Level}] {e.Message}");
+                Console.WriteLine($"[{e.Timestamp}] [{e.Application}] [{e.Level}] {e.Message}");
                 await CoolDownCheck();
             };
 
@@ -322,39 +332,45 @@ namespace DiscordantCirce
                 return Task.Delay(0);
             };
 
+            discord.SocketError += e => //An AntiDisconnect mechanism.
+            {
+                discord.DisconnectAsync(); //We remove the current connect so we don't flood the server.
+                Task.Delay(5000); //Wait five seconds
+                Console.WriteLine("Rebooting Bot");
+                Run();
+                return Task.Delay(0);
+            };
+
             discord.MessageCreated += async e =>
             {
-
-
-                    
                 if (e.Message.Content.ToLower() == "!test")
                 {
-                    await e.Message.Respond("The time is " + DateTime.Now);
+                    await e.Message.RespondAsync("The time is " + DateTime.Now);
                 }
 
-                if(e.Message.Content.ToLower() == "!help")
+                if (e.Message.Content.ToLower() == "!help")
                 {
                     await HelpMessage(discord, e);
                 }
 
-                if(e.Message.Content.ToLower() == "!list")
+                if (e.Message.Content.ToLower() == "!list")
                 {
                     await ListForms(discord, e);
                 }
-                if (!cooldowntank.ContainsKey(e.Author.ID))
+                if (!cooldowntank.ContainsKey(e.Author.Id))
                 {
                     if (e.Message.Content.ToLower() == "!cleanup" && !e.Channel.IsPrivate)
                     {
                         await Cleanup(discord, e, true);
-                        usercooldownIndex.Add(e.Author.ID);
-                        cooldowntank.Add(e.Author.ID,
-                            new CoolingUser(e.Author.ID));
-                        //await CoolDownCheck();
-                    }
+                        usercooldownIndex.Add(e.Author.Id);
+                        cooldowntank.Add(e.Author.Id,
+                            new CoolingUser(e.Author.Id));
+                            //await CoolDownCheck();
+                        }
 
                     if (e.Message.Content.ToLower() == "!zap" && !e.Channel.IsPrivate)
                     {
-                        await e.Message.Respond("The bot vibrates before blasting " + e.Message.Author.Mention + "!");
+                        await e.Message.RespondAsync("The bot vibrates before blasting " + e.Message.Author.Mention + "!");
 
                         Random rand = new Random();
                         int form = rand.Next(tfArray.Length);
@@ -372,24 +388,24 @@ namespace DiscordantCirce
 
                         finally
                         {
-                            usercooldownIndex.Add(e.Author.ID);
-                            cooldowntank.Add(e.Author.ID,
-                                new CoolingUser(e.Author.ID));
-                            //await CoolDownCheck();
-                        }
+                            usercooldownIndex.Add(e.Author.Id);
+                            cooldowntank.Add(e.Author.Id,
+                                new CoolingUser(e.Author.Id));
+                                //await CoolDownCheck();
+                            }
                     }
 
-                else
-                {
-                    //Console.WriteLine("User is still in time out!");
-                }
+                    else
+                    {
+                            //Console.WriteLine("User is still in time out!");
+                        }
 
-              }
+                }
 
                 await CoolDownCheck();
             };
 
-            await discord.Connect();
+            await discord.ConnectAsync();
             //await CoolDownCheck();
             await Task.Delay(-1);
 
