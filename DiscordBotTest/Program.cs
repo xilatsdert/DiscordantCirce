@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
 using System.Text;
@@ -24,13 +25,19 @@ namespace DiscordantCirce
         static StreamReader oauthFile;
         static string oauth;
 
+
         //data structures for handling the tfs - an array to prevent server-disk thrashing
         public static Form[] tfArray;
 
         //And one to prevent TF abuse. We will use a dictionary so we can easily store a cooling user (This is a poor man's dynamic database)
         //And another to actually track WHO is in the tank.
+        //The ulong used in the dictionary and list below are the user ID's held by discord.
         public static Dictionary<ulong, CoolingUser> cooldowntank = new Dictionary<ulong, CoolingUser>();
         public static List<ulong> usercooldownIndex = new List<ulong>();
+        public static bool cooldownLock = false; //the locker needed for thread keep alive.
+        public static bool started = false;
+
+        public static Thread cool;
 
         static void Main(string[] args)
         {
@@ -87,7 +94,7 @@ namespace DiscordantCirce
             {
                 Console.WriteLine("There is a problem with the oauth.txt file. Either it is empty, or the file is corrupt. Recreate the file.");
                 Console.ReadKey();
-                Environment.Exit(2);
+                Environment.Exit(3);
             }
 
             Run().GetAwaiter().GetResult();
@@ -130,12 +137,29 @@ namespace DiscordantCirce
 
         /// <summary>
         /// This method checks each item in the cooldown tank Dictionary for a user that has cooled down. Once they have, we have remove them from the dictionary and LIst tracker
-        /// This needs to be tossed onto another thread or else we got at hread blocker.
+        /// This needs to be tossed onto another thread or else we get a thread blocker.
         /// </summary>
-        /// <returns></returns>
-        public static async Task CoolDownCheck()
+        /// <returns>A new thread for process.</returns>
+        /// 
+        //TODO: Correct code to use a thread instead of a Task.
+        public static void CoolDownCheck()
         {
-            await Task.WhenAll(
+            started = true;
+            while (cooldownLock)
+            {
+                for (int i = 0; i < usercooldownIndex.Count; i++)
+                {
+                    if (cooldowntank[usercooldownIndex[i]].cooldown.ElapsedMilliseconds >= 10000)
+                    {
+                        ulong userID = usercooldownIndex[i];
+                        cooldowntank.Remove(userID);
+                        usercooldownIndex.Remove(userID);
+                        Console.WriteLine("Removed a user.");
+                    }
+                }
+            }
+
+            /*await Task.WhenAll(
             Task.Run(() =>
             {
                 for (int id = 0; id < usercooldownIndex.Count; id++)
@@ -159,7 +183,7 @@ namespace DiscordantCirce
                     }
                 }
             })
-            );
+            );*/
         }
 
         /// <summary>
@@ -232,6 +256,10 @@ namespace DiscordantCirce
                 await discord.CreateDmAsync(e.Author).Result.SendMessageAsync("Thank you! In a channel, type !cleanup to undo a change, type !zap for a transformation, and type !test to get the local computer time!");
                 await Task.Delay(1000);
                 await discord.CreateDmAsync(e.Author).Result.SendMessageAsync("Type in a channel !list for all of the loaded forms!");
+                await Task.Delay(1000);
+                await discord.CreateDmAsync(e.Author).Result.SendMessageAsync("All TFs have a 10 second cooldown. Please do not spam the bot.");
+
+
             }
 
             catch (Exception whoops)
@@ -297,10 +325,12 @@ namespace DiscordantCirce
                 await Task.Yield();
             }
 
+            /*
             finally
             {
                 await discord.CreateDmAsync(e.Message.Author).Result.SendMessageAsync("10 second cooldown engaged. Please do not spam the bot!");
             }
+            */
         }
 
         public static async Task Run()
@@ -318,26 +348,26 @@ namespace DiscordantCirce
                 Token = oauth,
                 TokenType = TokenType.Bot,
                 UseInternalLogHandler = false
+                
             });
+
+            //Start the checker.
+            cooldownLock = true;
+
+            if (!started)
+            {
+                cool = new Thread(new ThreadStart(CoolDownCheck));
+                cool.Start();
+            }
 
             discord.DebugLogger.LogMessageReceived += async (o, e) =>
             {
                 Console.WriteLine($"[{e.Timestamp}] [{e.Application}] [{e.Level}] {e.Message}");
-                await CoolDownCheck();
             };
 
             discord.GuildAvailable += e =>
             {
                 discord.DebugLogger.LogMessage(LogLevel.Info, "discord bot", $"Guild available: {e.Guild.Name}", DateTime.Now);
-                return Task.Delay(0);
-            };
-
-            discord.SocketError += e => //An AntiDisconnect mechanism.
-            {
-                discord.DisconnectAsync(); //We remove the current connect so we don't flood the server.
-                Task.Delay(5000); //Wait five seconds
-                Console.WriteLine("Rebooting Bot");
-                Run();
                 return Task.Delay(0);
             };
 
@@ -365,7 +395,6 @@ namespace DiscordantCirce
                         usercooldownIndex.Add(e.Author.Id);
                         cooldowntank.Add(e.Author.Id,
                             new CoolingUser(e.Author.Id));
-                            //await CoolDownCheck();
                         }
 
                     if (e.Message.Content.ToLower() == "!zap" && !e.Channel.IsPrivate)
@@ -398,11 +427,10 @@ namespace DiscordantCirce
                     else
                     {
                             //Console.WriteLine("User is still in time out!");
-                        }
+                     }
 
                 }
 
-                await CoolDownCheck();
             };
 
             await discord.ConnectAsync();
