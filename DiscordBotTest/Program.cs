@@ -37,7 +37,9 @@ namespace DiscordantCirce
         public static bool cooldownLock = false; //the locker needed for thread keep alive.
         public static bool started = false;
 
+        //Thread for checker and the stopwatch needed to control the timing of the thread..
         public static Thread cool;
+        public static Stopwatch coolWatch = new Stopwatch();
 
         static void Main(string[] args)
         {
@@ -97,6 +99,17 @@ namespace DiscordantCirce
                 Environment.Exit(3);
             }
 
+            //Start the checker for timed out users.
+            cooldownLock = true;
+
+            if (!started)
+            {
+                coolWatch.Start();
+                cool = new Thread(new ThreadStart(CoolDownCheck));
+                cool.Start();
+
+            }
+
             Run().GetAwaiter().GetResult();
 
         }
@@ -136,54 +149,36 @@ namespace DiscordantCirce
         }
 
         /// <summary>
-        /// This method checks each item in the cooldown tank Dictionary for a user that has cooled down. Once they have, we have remove them from the dictionary and LIst tracker
-        /// This needs to be tossed onto another thread or else we get a thread blocker.
+        /// This method performs work on a secondary thread, checking for members that can be removed.
+        /// It pauses for .5 seconds at the thread before restarting the check.
         /// </summary>
-        /// <returns>A new thread for process.</returns>
+        /// <returns></returns>
         /// 
-        //TODO: Correct code to use a thread instead of a Task.
         public static void CoolDownCheck()
         {
             started = true;
-            while (cooldownLock)
+            while (coolWatch.IsRunning)
             {
                 for (int i = 0; i < usercooldownIndex.Count; i++)
                 {
-                    if (cooldowntank[usercooldownIndex[i]].cooldown.ElapsedMilliseconds >= 10000)
+                    try
                     {
-                        ulong userID = usercooldownIndex[i];
-                        cooldowntank.Remove(userID);
-                        usercooldownIndex.Remove(userID);
-                        Console.WriteLine("Removed a user.");
+                        if (cooldowntank[usercooldownIndex[i]].cooldown.ElapsedMilliseconds >= 10000)
+                        {
+                            ulong userID = usercooldownIndex[i];
+                            cooldowntank.Remove(userID);
+                            usercooldownIndex.Remove(userID);
+                            Console.WriteLine("Removed a user.");
+                            Thread.Sleep(500);
+                        }
+                    }
+
+                    catch
+                    {
+                        Console.WriteLine("User " + i + "does not exist.");
                     }
                 }
             }
-
-            /*await Task.WhenAll(
-            Task.Run(() =>
-            {
-                for (int id = 0; id < usercooldownIndex.Count; id++)
-                {
-                    // while (cooldowntank.Count > 0)
-                    {
-                        if (cooldowntank[usercooldownIndex[id]].cooldown.ElapsedMilliseconds >= 10000)
-                        {
-                            ulong userId = usercooldownIndex[id];
-                            cooldowntank.Remove(userId);
-                            usercooldownIndex.Remove(userId);
-                            Console.WriteLine("REMOVED A USER");
-                        }
-
-                        else
-                        {
-                            {
-                                Console.WriteLine("User ID still in Timeout -> " + id + " :: Seconds in time out -> " + cooldowntank[usercooldownIndex[id]].cooldown.ElapsedMilliseconds / 1000);
-                            }
-                        }
-                    }
-                }
-            })
-            );*/
         }
 
         /// <summary>
@@ -351,15 +346,6 @@ namespace DiscordantCirce
                 
             });
 
-            //Start the checker.
-            cooldownLock = true;
-
-            if (!started)
-            {
-                cool = new Thread(new ThreadStart(CoolDownCheck));
-                cool.Start();
-            }
-
             discord.DebugLogger.LogMessageReceived += async (o, e) =>
             {
                 Console.WriteLine($"[{e.Timestamp}] [{e.Application}] [{e.Level}] {e.Message}");
@@ -423,11 +409,6 @@ namespace DiscordantCirce
                                 //await CoolDownCheck();
                             }
                     }
-
-                    else
-                    {
-                            //Console.WriteLine("User is still in time out!");
-                     }
 
                 }
 
